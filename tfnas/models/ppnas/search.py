@@ -19,7 +19,7 @@ class MixedOp(Layer):
             self._ops.append(op)
 
     def call(self, x, weights):
-        return sum(w * op(x) for w, op in zip(weights, self._ops))
+        return sum(weights[i] * op(x) for i, op in enumerate(self._ops))
 
 
 class PPConv(Layer):
@@ -46,7 +46,7 @@ class PPConv(Layer):
         return tf.concat(states[-self.splits:], axis=-1)
 
 
-class Bottleneck(Model):
+class Bottleneck(Layer):
     expansion = 4
 
     def __init__(self, in_channels, channels, stride, base_width, splits,
@@ -128,7 +128,7 @@ def beta_softmax(betas, steps, scale=False):
     return betas
 
 
-class Network(Layer):
+class Network(Model):
 
     def __init__(self, depth=56, base_width=13, splits=4, num_classes=10, stages=(32, 32, 64, 128)):
         super().__init__()
