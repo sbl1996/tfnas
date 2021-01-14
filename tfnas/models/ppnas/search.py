@@ -35,6 +35,7 @@ class PPConv(Layer):
             self.ops.append(op)
 
     def call(self, x, alphas, betas):
+        print(x.dtype)
         states = list(tf.split(x, self.splits, axis=-1))
         offset = 0
         for i in range(self.splits):
@@ -185,10 +186,10 @@ class Network(Model):
     def call(self, x):
         alphas = beta_softmax(self.alphas, self.splits)
         betas = tf.nn.softmax(self.betas, axis=1)
-        alphas = tf.cast(alphas, x.dtype)
-        betas = tf.cast(betas, x.dtype)
 
         x = self.stem(x)
+        alphas = tf.cast(alphas, x.dtype)
+        betas = tf.cast(betas, x.dtype)
 
         for l in self.layer1:
             x = l(x, alphas, betas)
