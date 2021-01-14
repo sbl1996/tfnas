@@ -35,7 +35,6 @@ class PPConv(Layer):
             self.ops.append(op)
 
     def call(self, x, alphas, betas):
-        print(x.dtype)
         states = list(tf.split(x, self.splits, axis=-1))
         offset = 0
         for i in range(self.splits):
