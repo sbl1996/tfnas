@@ -185,6 +185,8 @@ class Network(Model):
     def call(self, x):
         alphas = beta_softmax(self.alphas, self.splits)
         betas = tf.nn.softmax(self.betas, axis=1)
+        alphas = tf.cast(alphas, x.dtype)
+        betas = tf.cast(betas, x.dtype)
 
         x = self.stem(x)
 
