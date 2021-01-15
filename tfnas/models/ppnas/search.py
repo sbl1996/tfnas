@@ -187,7 +187,8 @@ class Network(Model):
         normal = []
         for i in range(self.splits):
             a = alphas[offset:offset + i + self.splits]
-            c1, c2 = np.argpartition(-a, 2)[:2]
+            c1, c2 = np.argpartition(-a, 2)[:2] + 1
             op = primitives[betas[i].argmax()]
             normal.append((c1, c2, op))
+            offset += self.splits + i
         return Genotype(normal=normal)
