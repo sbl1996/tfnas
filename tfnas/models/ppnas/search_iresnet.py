@@ -1,15 +1,13 @@
 import math
-import numpy as np
-
 import tensorflow as tf
-from tensorflow.keras import Model
+from tensorflow.keras import Sequential, Model
 from tensorflow.keras.layers import Layer
 from tensorflow.keras.initializers import RandomNormal
 from hanser.models.layers import Conv2d, Norm, Act, Linear, Pool2d, Sequential, Identity, GlobalAvgPool
 
 from tfnas.models.ppnas.operations import OPS
 from tfnas.models.ppnas.primitives import get_primitives
-from tfnas.models.ppnas.genotypes import Genotype
+
 
 class MixedOp(Layer):
 
@@ -51,21 +49,33 @@ class PPConv(Layer):
 class Bottleneck(Layer):
     expansion = 4
 
-    def __init__(self, in_channels, channels, stride, base_width, splits):
+    def __init__(self, in_channels, channels, stride, base_width, splits,
+                 start_block=False, end_block=False, exclude_bn0=False):
         super().__init__()
         self.stride = stride
 
         out_channels = channels * self.expansion
         width = math.floor(out_channels // self.expansion * (base_width / 64)) * splits
-        self.conv1 = Conv2d(in_channels, width, kernel_size=1,
-                            norm='def', act='def')
+        if not start_block and not exclude_bn0:
+            self.bn0 = Norm(in_channels)
+        if not start_block:
+            self.act0 = Act()
+        self.conv1 = Conv2d(in_channels, width, kernel_size=1)
+        self.bn1 = Norm(width)
+        self.act1 = Act()
         if stride == 1:
             self.conv2 = PPConv(width, splits=splits)
         else:
-            self.conv2 = Conv2d(width, width, kernel_size=3, stride=2, groups=splits,
-                                norm='def', act='def')
+            self.conv2 = Conv2d(width, width, kernel_size=3, stride=2,
+                                groups=splits)
         self.conv3 = Conv2d(width, out_channels, kernel_size=1)
-        self.bn3 = Norm(out_channels, gamma_init='zeros')
+
+        if start_block:
+            self.bn3 = Norm(out_channels)
+
+        if end_block:
+            self.bn3 = Norm(out_channels)
+            self.act3 = Act()
 
         if stride != 1 or in_channels != out_channels:
             shortcut = []
@@ -76,20 +86,32 @@ class Bottleneck(Layer):
             self.shortcut = Sequential(shortcut)
         else:
             self.shortcut = Identity()
-
-        self.act = Act()
+        self.start_block = start_block
+        self.end_block = end_block
+        self.exclude_bn0 = exclude_bn0
 
     def call(self, x, alphas, betas):
         identity = self.shortcut(x)
-        x = self.conv1(x)
+        if self.start_block:
+            x = self.conv1(x)
+        else:
+            if not self.exclude_bn0:
+                x = self.bn0(x)
+            x = self.act0(x)
+            x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.act1(x)
         if self.stride == 1:
             x = self.conv2(x, alphas, betas)
         else:
             x = self.conv2(x)
         x = self.conv3(x)
-        x = self.bn3(x)
+        if self.start_block:
+            x = self.bn3(x)
         x = x + identity
-        x = self.act(x)
+        if self.end_block:
+            x = self.bn3(x)
+            x = self.act3(x)
         return x
 
 
@@ -108,7 +130,7 @@ def beta_softmax(betas, steps, scale=False):
 
 class Network(Model):
 
-    def __init__(self, depth=56, base_width=13, splits=4, num_classes=10, stages=(32, 32, 64, 128)):
+    def __init__(self, depth=56, base_width=12, splits=4, num_classes=10, stages=(32, 32, 64, 128)):
         super().__init__()
         self.stages = stages
         self.splits = splits
@@ -151,10 +173,13 @@ class Network(Model):
         )
 
     def _make_layer(self, block, channels, blocks, stride, **kwargs):
-        layers = [block(self.in_channels, channels, stride=stride, **kwargs)]
+        layers = [block(self.in_channels, channels, stride=stride, start_block=True,
+                        **kwargs)]
         self.in_channels = channels * block.expansion
         for i in range(1, blocks):
-            layers.append(block(self.in_channels, channels, stride=1, **kwargs))
+            layers.append(block(self.in_channels, channels, stride=1,
+                                exclude_bn0=i == 1, end_block=i == blocks - 1,
+                                **kwargs))
         return layers
 
     def call(self, x):
@@ -175,19 +200,3 @@ class Network(Model):
         x = self.avgpool(x)
         x = self.fc(x)
         return x
-
-    def genotype(self):
-        primitives = get_primitives()
-        alphas = tf.convert_to_tensor(self.alphas.numpy())
-        alphas = beta_softmax(alphas, self.splits).numpy()
-
-        betas = tf.nn.softmax(self.betas.numpy(), axis=1).numpy()
-
-        offset = 0
-        normal = []
-        for i in range(self.splits):
-            a = alphas[offset:offset + i + self.splits]
-            c1, c2 = np.argpartition(-a, 2)[:2]
-            op = primitives[betas[i].argmax()]
-            normal.append((c1, c2, op))
-        return Genotype(normal=normal)
