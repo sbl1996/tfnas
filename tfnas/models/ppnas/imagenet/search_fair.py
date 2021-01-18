@@ -8,7 +8,7 @@ from tfnas.models.ppnas.search_fair import Network as CIFARNetwork, Bottleneck
 class Network(CIFARNetwork):
 
     def __init__(self, layers=(3, 4, 6, 4), base_width=24, splits=4,
-                 num_classes=1000, stages=(64, 128, 128, 256, 512)):
+                 num_classes=1000, stages=(64, 64, 128, 256, 512)):
         super().__init__()
         self.stages = stages
         self.splits = splits
