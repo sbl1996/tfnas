@@ -161,9 +161,9 @@ class Network(Model):
         weight_loss = tf.reduce_mean(weight_loss)
         return fair_loss + weight_loss
 
-    def genotype(self):
+    def genotype(self, threshold=0.9):
         alphas = tf.convert_to_tensor(self.alphas.numpy())
-        alphas = tf.nn.sigmoid(alphas)
+        alphas = tf.nn.sigmoid(alphas).numpy()
 
         normal = []
         for s in range(self.num_stages):
@@ -171,8 +171,10 @@ class Network(Model):
             offset = 0
             for i in range(self.splits):
                 a = alphas[s, offset:offset + i + self.splits]
-                c1, c2 = np.argpartition(-a, 2)[:2] + 1
-                conns.append((c1, c2, 'nor_conv_3x3'))
+                cs = np.arange(len(a))[a > threshold] + 1
+                conns.append((*cs, 'nor_conv_3x3'))
                 offset += self.splits + i
             normal.append(conns)
         return Genotype(normal=normal)
+
+
