@@ -142,6 +142,25 @@ class Network(Model):
         x = self.fc(x)
         return x
 
+    def arch_loss(self):
+        probs = tf.nn.sigmoid(self.alphas)
+        fair_loss = -tf.square((probs - 0.5))
+        fair_loss = tf.reduce_mean(fair_loss)
+
+        k = self.splits
+        n = tf.range(k)
+        indices = k * n + n * (n - 1) // 2
+        indices = n[:, None] + indices[None, :]
+        weights = tf.gather(probs, indices, axis=1)
+        weight_sum = tf.reduce_sum(weights, axis=1)
+        weight_loss = tf.where(
+            weight_sum > 1.,
+            tf.zeros_like(weight_sum),
+            tf.square(weight_sum - 1),
+        )
+        weight_loss = tf.reduce_mean(weight_loss)
+        return fair_loss + weight_loss
+
     def genotype(self):
         alphas = tf.convert_to_tensor(self.alphas.numpy())
         alphas = tf.nn.sigmoid(alphas)
