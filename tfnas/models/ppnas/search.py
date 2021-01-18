@@ -93,22 +93,22 @@ class Bottleneck(Layer):
         return x
 
 
-def beta_softmax(betas, steps, scale=False):
-    beta_list = []
+def alpha_softmax(betas, steps, scale=False):
+    alpha_list = []
     offset = 0
     for i in range(steps):
         beta = tf.nn.softmax(betas[offset:(offset + i + steps)], axis=0)
         if scale:
             beta = beta * len(beta)
-        beta_list.append(beta)
+        alpha_list.append(beta)
         offset += i + steps
-    betas = tf.concat(beta_list, axis=0)
+    betas = tf.concat(alpha_list, axis=0)
     return betas
 
 
 class Network(Model):
 
-    def __init__(self, depth=56, base_width=13, splits=4, num_classes=10, stages=(32, 32, 64, 128)):
+    def __init__(self, depth=110, base_width=24, splits=4, num_classes=10, stages=(64, 64, 128, 256)):
         super().__init__()
         self.stages = stages
         self.splits = splits
@@ -133,11 +133,8 @@ class Network(Model):
 
         self._initialize_alphas()
 
-    def index_model(self, xss):
-        return tuple(xs[:-2] for xs in xss)
-
-    def index_arch(self, xss):
-        return tuple(xs[-2:] for xs in xss)
+    def param_splits(self):
+        return slice(None, -1), slice(-1, None)
 
     def _initialize_alphas(self):
         k = sum(4 + i for i in range(self.splits))
@@ -158,7 +155,7 @@ class Network(Model):
         return layers
 
     def call(self, x):
-        alphas = beta_softmax(self.alphas, self.splits)
+        alphas = alpha_softmax(self.alphas, self.splits)
         betas = tf.nn.softmax(self.betas, axis=1)
 
         x = self.stem(x)
@@ -179,7 +176,7 @@ class Network(Model):
     def genotype(self):
         primitives = get_primitives()
         alphas = tf.convert_to_tensor(self.alphas.numpy())
-        alphas = beta_softmax(alphas, self.splits).numpy()
+        alphas = alpha_softmax(alphas, self.splits).numpy()
 
         betas = tf.nn.softmax(self.betas.numpy(), axis=1).numpy()
 

@@ -80,16 +80,17 @@ class Bottleneck(Layer):
         return x
 
 
-def beta_softmax(betas, steps, scale=False):
-    beta_list = []
+def alpha_softmax(betas, steps, scale=False):
+    alpha_list = []
     offset = 0
+    axis = 1
     for i in range(steps):
-        beta = tf.nn.softmax(betas[offset:(offset + i + steps)], axis=0)
+        beta = tf.nn.softmax(betas[:, offset:(offset + i + steps)], axis=axis)
         if scale:
             beta = beta * len(beta)
-        beta_list.append(beta)
+        alpha_list.append(beta)
         offset += i + steps
-    betas = tf.concat(beta_list, axis=0)
+    betas = tf.concat(alpha_list, axis=axis)
     return betas
 
 
@@ -121,11 +122,8 @@ class Network(Model):
 
         self._initialize_alphas()
 
-    def index_model(self, xss):
-        return tuple(xs[:-2] for xs in xss)
-
-    def index_arch(self, xss):
-        return tuple(xs[-2:] for xs in xss)
+    def param_splits(self):
+        return slice(None, -1), slice(-1, None)
 
     def _initialize_alphas(self):
         k = sum(4 + i for i in range(self.splits))
@@ -142,7 +140,7 @@ class Network(Model):
         return layers
 
     def call(self, x):
-        alphas = beta_softmax(self.alphas, self.splits)
+        alphas = alpha_softmax(self.alphas, self.splits)
 
         x = self.stem(x)
         alphas = tf.cast(alphas, x.dtype)
@@ -160,13 +158,16 @@ class Network(Model):
 
     def genotype(self):
         alphas = tf.convert_to_tensor(self.alphas.numpy())
-        alphas = beta_softmax(alphas, self.splits).numpy()
+        alphas = alpha_softmax(alphas, self.splits).numpy()
 
-        offset = 0
         normal = []
-        for i in range(self.splits):
-            a = alphas[offset:offset + i + self.splits]
-            c1, c2 = np.argpartition(-a, 2)[:2] + 1
-            normal.append((c1, c2, 'nor_conv_3x3'))
-            offset += self.splits + i
+        for s in range(self.num_stages):
+            conns = []
+            offset = 0
+            for i in range(self.splits):
+                a = alphas[s, offset:offset + i + self.splits]
+                c1, c2 = np.argpartition(-a, 2)[:2] + 1
+                conns.append((c1, c2, 'nor_conv_3x3'))
+                offset += self.splits + i
+            normal.append(conns)
         return Genotype(normal=normal)
