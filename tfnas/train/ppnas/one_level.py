@@ -23,8 +23,8 @@ def apply_gradients(learner, optimizer, grads, vars, grad_clip_norm=None):
 class PPNASLearner(Learner):
 
     def __init__(self, model: Network, criterion, optimizer_arch, optimizer_model,
-                 **kwargs):
-        self.train_arch = True
+                 add_fair_loss=False, **kwargs):
+        self.add_fair_loss = add_fair_loss
         super().__init__(model, criterion, (optimizer_arch, optimizer_model), **kwargs)
 
     def train_batch(self, batch):
@@ -38,6 +38,10 @@ class PPNASLearner(Learner):
             logits = cast(logits, tf.float32)
             per_example_loss = self.criterion(target, logits)
             loss = self.reduce_loss(per_example_loss)
+            if self.add_fair_loss:
+                alphas = tf.nn.sigmoid(model.alphas)
+                fair_loss = -tf.reduce_mean(tf.square((alphas - 0.5)))
+                loss = loss + fair_loss
 
         variables = model.trainable_variables
         grads = tape.gradient(loss, variables)
