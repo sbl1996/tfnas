@@ -176,5 +176,3 @@ class Network(Model):
                 offset += self.splits + i
             normal.append(conns)
         return Genotype(normal=normal)
-
-
