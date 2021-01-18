@@ -2,10 +2,10 @@ import math
 import numpy as np
 
 import tensorflow as tf
-from tensorflow.keras import Model
+from tensorflow.keras import Model, Sequential
 from tensorflow.keras.layers import Layer
 from tensorflow.keras.initializers import RandomNormal
-from hanser.models.layers import Conv2d, Norm, Act, Linear, Pool2d, Sequential, Identity, GlobalAvgPool
+from hanser.models.layers import Conv2d, Norm, Act, Linear, Pool2d, Identity, GlobalAvgPool
 
 from tfnas.models.ppnas.operations import OPS
 from tfnas.models.ppnas.primitives import get_primitives
@@ -134,7 +134,7 @@ class Network(Model):
         self._initialize_alphas()
 
     def param_splits(self):
-        return slice(None, -1), slice(-1, None)
+        return slice(None, -2), slice(-2, None)
 
     def _initialize_alphas(self):
         k = sum(4 + i for i in range(self.splits))
