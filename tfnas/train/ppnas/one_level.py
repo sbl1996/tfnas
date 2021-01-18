@@ -41,7 +41,7 @@ class PPNASLearner(Learner):
 
         variables = model.trainable_variables
         grads = tape.gradient(loss, variables)
-        model_slice, arch_slice = model.param_splits
+        model_slice, arch_slice = model.param_splits()
         apply_gradients(self, optimizer_model, grads[model_slice], variables[model_slice], self.grad_clip_norm)
         apply_gradients(self, optimizer_arch, grads[arch_slice], variables[arch_slice])
 
