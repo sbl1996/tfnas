@@ -4,7 +4,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras import Model, Sequential
 from tensorflow.keras.layers import Layer
-from tensorflow.keras.initializers import RandomNormal
+from tensorflow.keras.initializers import RandomNormal, Constant
 from hanser.models.layers import Conv2d, Norm, Act, Linear, Pool2d, Identity, GlobalAvgPool
 
 from tfnas.models.ppnas.operations import OPS
@@ -82,7 +82,7 @@ class Bottleneck(Layer):
 
 class Network(Model):
 
-    def __init__(self, depth=56, base_width=13, splits=4, num_classes=10, stages=(32, 32, 64, 128)):
+    def __init__(self, depth=56, base_width=12, splits=4, num_classes=10, stages=(32, 32, 64, 128)):
         super().__init__()
         self.stages = stages
         self.splits = splits
@@ -107,6 +107,17 @@ class Network(Model):
         self.fc = Linear(self.in_channels, num_classes)
 
         self._initialize_alphas()
+
+        self.fair_loss_weight = self.add_weight(
+            "fair_loss_weight", shape=(),
+            dtype=self.dtype, initializer=Constant(1.),
+        )
+
+        self.edge_loss_weight = self.add_weight(
+            "edge_loss_weight", shape=(),
+            dtype=self.dtype, initializer=Constant(1.),
+        )
+
 
     def param_splits(self):
         return slice(None, -1), slice(-1, None)
@@ -153,13 +164,13 @@ class Network(Model):
         indices = n[:, None] + indices[None, :]
         weights = tf.gather(probs, indices, axis=1)
         weight_sum = tf.reduce_sum(weights, axis=1)
-        weight_loss = tf.where(
+        edge_loss = tf.where(
             weight_sum > 1.,
             tf.zeros_like(weight_sum),
             tf.square(weight_sum - 1),
         )
-        weight_loss = tf.reduce_mean(weight_loss)
-        return fair_loss + weight_loss
+        edge_loss = tf.reduce_mean(edge_loss)
+        return self.fair_loss_weight * fair_loss + self.edge_loss_weight * edge_loss
 
     def genotype(self, threshold=0.9):
         alphas = tf.convert_to_tensor(self.alphas.numpy())
