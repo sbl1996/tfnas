@@ -27,7 +27,9 @@ class PPConv(Layer):
         states = list(tf.split(x, self.splits, axis=-1))
         offset = 0
         for i in range(self.splits):
-            x = sum(alphas[offset + j] * h for j, h in enumerate(states))
+            alphas_i = alphas[offset:offset + len(states)]
+            alphas_i = alphas_i / tf.reduce_sum(alphas_i)
+            x = sum(alphas_i[j] * h for j, h in enumerate(states))
             x = self.ops[i](x)
             offset += len(states)
             states.append(x)
