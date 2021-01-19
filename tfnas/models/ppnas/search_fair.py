@@ -159,13 +159,14 @@ class Network(Model):
         probs = tf.nn.sigmoid(self.alphas)
         fair_loss = -tf.square((probs - 0.5))
         fair_loss = tf.reduce_mean(fair_loss)
+        fair_loss = fair_loss + 0.25
 
         k = self.splits
         n = tf.range(k)
         indices = k * n + n * (n - 1) // 2
         indices = n[:, None] + indices[None, :]
         weights = tf.gather(probs, indices, axis=1)
-        weight_sum = tf.reduce_sum(weights, axis=1)
+        weight_sum = tf.reduce_sum(weights, axis=2)
         edge_loss = tf.where(
             weight_sum > 1.,
             tf.zeros_like(weight_sum),
