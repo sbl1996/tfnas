@@ -109,13 +109,13 @@ class Network(Model):
         self._initialize_alphas()
 
         self.fair_loss_weight = self.add_weight(
-            "fair_loss_weight", shape=(),
+            name="fair_loss_weight", shape=(),
             dtype=self.dtype, initializer=Constant(1.),
             trainable=False,
         )
 
         self.edge_loss_weight = self.add_weight(
-            "edge_loss_weight", shape=(),
+            name="edge_loss_weight", shape=(),
             dtype=self.dtype, initializer=Constant(1.),
             trainable=False,
         )
@@ -128,7 +128,7 @@ class Network(Model):
         k = sum(4 + i for i in range(self.splits))
 
         self.alphas = self.add_weight(
-            'alphas', (self.num_stages, k), initializer=RandomNormal(stddev=1e-3), trainable=True,
+            'alphas', (self.num_stages, k), initializer=Constant(0.), trainable=True,
         )
 
     def _make_layer(self, block, channels, blocks, stride, **kwargs):
