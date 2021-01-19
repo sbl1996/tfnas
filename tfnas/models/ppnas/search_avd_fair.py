@@ -2,6 +2,7 @@ import math
 import numpy as np
 
 import tensorflow as tf
+from hanser.models.cifar.res2net.layers import StartRes2Conv
 from tensorflow.keras import Model, Sequential
 from tensorflow.keras.layers import Layer
 from tensorflow.keras.initializers import Constant
@@ -51,8 +52,8 @@ class Bottleneck(Layer):
         if stride != 1:
             self.conv2 = Sequential([
                 Pool2d(3, stride=stride, type='avg'),
-                Conv2d(width, width, kernel_size=3, stride=1, groups=splits,
-                       norm='def', act='def'),
+                StartRes2Conv(width, kernel_size=3, stride=1, scale=splits,
+                              norm='def', act='def'),
             ])
         else:
             self.conv2 = PPConv(width, splits=splits)
