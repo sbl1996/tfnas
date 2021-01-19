@@ -4,7 +4,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras import Model, Sequential
 from tensorflow.keras.layers import Layer
-from tensorflow.keras.initializers import RandomNormal, Constant
+from tensorflow.keras.initializers import Constant
 from hanser.models.layers import Conv2d, Norm, Act, Linear, Pool2d, Identity, GlobalAvgPool
 
 from tfnas.models.ppnas.operations import OPS
@@ -120,6 +120,11 @@ class Network(Model):
             trainable=False,
         )
 
+        self.l2_loss_weight = self.add_weight(
+            name="l2_loss_weight", shape=(),
+            dtype=self.dtype, initializer=Constant(1.),
+            trainable=False,
+        )
 
     def param_splits(self):
         return slice(None, -1), slice(-1, None)
@@ -173,7 +178,10 @@ class Network(Model):
             tf.square(weight_sum - 1),
         )
         edge_loss = tf.reduce_mean(edge_loss)
-        return self.fair_loss_weight * fair_loss + self.edge_loss_weight * edge_loss
+
+        l2_loss = 0.5 * tf.square(self.alphas)
+        l2_loss = tf.reduce_mean(l2_loss)
+        return self.fair_loss_weight * fair_loss + self.edge_loss_weight * edge_loss + self.l2_loss_weight * l2_loss
 
     def genotype(self, threshold=0.9):
         alphas = tf.convert_to_tensor(self.alphas.numpy())
