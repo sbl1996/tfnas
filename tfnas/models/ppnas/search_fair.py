@@ -111,11 +111,13 @@ class Network(Model):
         self.fair_loss_weight = self.add_weight(
             "fair_loss_weight", shape=(),
             dtype=self.dtype, initializer=Constant(1.),
+            trainable=False,
         )
 
         self.edge_loss_weight = self.add_weight(
             "edge_loss_weight", shape=(),
             dtype=self.dtype, initializer=Constant(1.),
+            trainable=False,
         )
 
 
