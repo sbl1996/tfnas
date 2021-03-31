@@ -43,18 +43,23 @@ class Bottleneck(Layer):
 
     def __init__(self, in_channels, channels, stride, base_width, splits):
         super().__init__()
-        self.stride = stride
-
         out_channels = channels * self.expansion
+
+        self.stride = stride
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+
         width = math.floor(out_channels // self.expansion * (base_width / 64)) * splits
         self.conv1 = Conv2d(in_channels, width, kernel_size=1,
                             norm='def', act='def')
-        if stride != 1:
-            self.conv2 = Sequential([
-                Pool2d(3, stride=stride, type='avg'),
+        if stride != 1 or in_channels != out_channels:
+            layers = []
+            if stride != 1:
+                layers.append(Pool2d(3, stride=2, type='avg'))
+            layers.append(
                 StartRes2Conv(width, kernel_size=3, stride=1, scale=splits,
-                              norm='def', act='def'),
-            ])
+                              norm='def', act='def'))
+            self.conv2 = Sequential(layers)
         else:
             self.conv2 = PPConv(width, splits=splits)
         self.conv3 = Conv2d(width, out_channels, kernel_size=1)
@@ -75,10 +80,10 @@ class Bottleneck(Layer):
     def call(self, x, alphas):
         identity = self.shortcut(x)
         x = self.conv1(x)
-        if self.stride == 1:
-            x = self.conv2(x, alphas)
-        else:
+        if self.stride != 1 or self.in_channels != self.out_channels:
             x = self.conv2(x)
+        else:
+            x = self.conv2(x, alphas)
         x = self.conv3(x)
         x = self.bn3(x)
         x = x + identity
