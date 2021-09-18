@@ -33,11 +33,10 @@ class MixedOp(Layer):
                     ])
             self._ops.append(op)
 
-    def call(self, inputs):
-        x, hardwts = inputs
+    def call(self, x, hardwts):
         xs = [
-            tf.cond(hardwts[i] == 1, lambda: self.ops[i](x) * hardwts[i], lambda: hardwts[i])
-            for i in range(len(self.ops))
+            tf.cond(hardwts[i] == 1, lambda: self._ops[i](x) * hardwts[i], lambda: hardwts[i])
+            for i in range(len(self._ops))
         ]
         return sum(xs)
 
@@ -63,15 +62,14 @@ class Cell(Layer):
                 op = MixedOp(C, stride, drop_path)
                 self._ops.append(op)
 
-    def call(self, inputs):
-        s0, s1, hardwts = inputs
+    def call(self, s0, s1, hardwts):
         s0 = self.preprocess0(s0)
         s1 = self.preprocess1(s1)
 
         states = [s0, s1]
         offset = 0
         for i in range(self._steps):
-            s = tf.add_n([self._ops[offset + j]([h, hardwts[offset + j]]) for j, h in enumerate(states)])
+            s = tf.add_n([self._ops[offset + j](h, hardwts[offset + j]) for j, h in enumerate(states)])
             offset += len(states)
             states.append(s)
 
@@ -114,13 +112,13 @@ class Network(Model):
         num_ops = len(get_primitives())
         self.alphas_normal = self.add_weight(
             'alphas_normal', (k, num_ops), initializer=RandomNormal(stddev=1e-2), trainable=True,
-        )
+            experimental_autocast=False)
         self.alphas_reduce = self.add_weight(
             'alphas_reduce', (k, num_ops), initializer=RandomNormal(stddev=1e-2), trainable=True,
-        )
+            experimental_autocast=False)
 
         self.tau = self.add_weight(
-            'tau', (), initializer=Constant(1.0), trainable=False)
+            'tau', (), initializer=Constant(1.0), trainable=False, experimental_autocast=False)
 
     def param_splits(self):
         return slice(None, -2), slice(-2, None)
@@ -131,7 +129,8 @@ class Network(Model):
         hardwts_normal = gumbel_softmax(self.alphas_normal, self.tau)
         for cell in self.cells:
             hardwts = hardwts_reduce if cell.reduction else hardwts_normal
-            s0, s1 = s1, cell([s0, s1, hardwts])
+            hardwts = tf.cast(hardwts, x.dtype)
+            s0, s1 = s1, cell(s0, s1, hardwts)
         x = self.avg_pool(s1)
         logits = self.classifier(x)
         return logits

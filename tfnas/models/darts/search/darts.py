@@ -110,10 +110,10 @@ class Network(Model):
         num_ops = len(get_primitives())
         self.alphas_normal = self.add_weight(
             'alphas_normal', (k, num_ops), initializer=RandomNormal(stddev=1e-2), trainable=True,
-        )
+            experimental_autocast=False)
         self.alphas_reduce = self.add_weight(
             'alphas_reduce', (k, num_ops), initializer=RandomNormal(stddev=1e-2), trainable=True,
-        )
+            experimental_autocast=False)
 
     def param_splits(self):
         return slice(None, -2), slice(-2, None)
@@ -124,6 +124,7 @@ class Network(Model):
         weights_normal = tf.nn.softmax(self.alphas_normal, axis=-1)
         for cell in self.cells:
             weights = weights_reduce if cell.reduction else weights_normal
+            weights = tf.cast(weights, x.dtype)
             s0, s1 = s1, cell([s0, s1, weights])
         x = self.avg_pool(s1)
         logits = self.classifier(x)

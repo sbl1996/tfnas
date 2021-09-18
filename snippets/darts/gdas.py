@@ -83,4 +83,4 @@ learner = DARTSLearner(
 
 learner.fit(ds_train, epochs, ds_eval, val_freq=5,
             steps_per_epoch=steps_per_epoch, val_steps=eval_steps,
-            callbacks=[PrintGenotype(16), TrainArch(16), TauSchedule(tau_max=10.0, tau_min=0.1)])
+            callbacks=[PrintGenotype(80), TrainArch(80), TauSchedule(tau_max=10.0, tau_min=0.1)])

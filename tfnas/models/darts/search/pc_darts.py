@@ -133,17 +133,17 @@ class Network(Model):
         num_ops = len(get_primitives())
         self.alphas_normal = self.add_weight(
             'alphas_normal', (k, num_ops), initializer=RandomNormal(stddev=1e-2), trainable=True,
-        )
+            experimental_autocast=False)
         self.alphas_reduce = self.add_weight(
             'alphas_reduce', (k, num_ops), initializer=RandomNormal(stddev=1e-2), trainable=True,
-        )
+            experimental_autocast=False)
 
         self.betas_normal = self.add_weight(
             'betas_normal', (k,), initializer=RandomNormal(stddev=1e-2), trainable=True,
-        )
+            experimental_autocast=False)
         self.betas_reduce = self.add_weight(
             'betas_reduce', (k,), initializer=RandomNormal(stddev=1e-2), trainable=True,
-        )
+            experimental_autocast=False)
 
     def call(self, x):
         s0 = s1 = self.stem(x)
@@ -157,6 +157,7 @@ class Network(Model):
         for cell in self.cells:
             alphas = alphas_reduce if cell.reduction else alphas_normal
             betas = betas_reduce if cell.reduction else betas_normal
+            alphas, betas = tf.cast(alphas), tf.cast(betas)
             s0, s1 = s1, cell([s0, s1, alphas, betas])
         x = self.global_pool(s1)
         logits = self.fc(x)
