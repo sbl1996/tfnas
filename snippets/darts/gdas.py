@@ -12,11 +12,11 @@ from hanser.losses import CrossEntropy
 from hanser.train.optimizers import SGD
 from hanser.models.layers import set_defaults
 
-from tfnas.models.darts.search.pc_darts import Network
+from tfnas.models.darts.search.gdas import Network
 from tfnas.train.darts import DARTSLearner
 from tfnas.models.darts.primitives import set_primitives
 from tfnas.datasets.cifar import make_darts_cifar10_dataset
-from tfnas.train.callbacks import PrintGenotype, TrainArch
+from tfnas.train.callbacks import PrintGenotype, TrainArch, TauSchedule
 
 @curry
 def transform(image, label, training):
@@ -55,13 +55,13 @@ set_defaults({
 
 set_primitives('tiny')
 
-model = Network(4, 5, k=4)
+model = Network(4, 5)
 model.build((None, 32, 32, 3))
 
 criterion = CrossEntropy()
 
 base_lr = 0.025
-epochs = 50
+epochs = 240
 lr_schedule = CosineLR(base_lr * mul, steps_per_epoch, epochs=epochs, min_lr=1e-3)
 optimizer_model = SGD(lr_schedule, momentum=0.9, weight_decay=3e-4)
 optimizer_arch = AdamW(learning_rate=6e-4, beta_1=0.5, weight_decay=1e-3)
@@ -83,4 +83,4 @@ learner = DARTSLearner(
 
 learner.fit(ds_train, epochs, ds_eval, val_freq=5,
             steps_per_epoch=steps_per_epoch, val_steps=eval_steps,
-            callbacks=[PrintGenotype(16), TrainArch(16)])
+            callbacks=[PrintGenotype(16), TrainArch(16), TauSchedule(tau_max=10.0, tau_min=0.1)])

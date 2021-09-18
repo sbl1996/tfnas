@@ -62,7 +62,7 @@ criterion = CrossEntropy()
 
 base_lr = 0.025
 epochs = 50
-lr_schedule = CosineLR(base_lr * mul, steps_per_epoch, epochs=epochs, min_lr=0)
+lr_schedule = CosineLR(base_lr * mul, steps_per_epoch, epochs=epochs, min_lr=1e-3)
 optimizer_model = SGD(lr_schedule, momentum=0.9, weight_decay=3e-4)
 optimizer_arch = AdamW(learning_rate=6e-4, beta_1=0.5, weight_decay=1e-3)
 
