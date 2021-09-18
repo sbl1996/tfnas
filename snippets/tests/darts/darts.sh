@@ -1,1 +1,0 @@
-python train.py configs/pc_darts.py

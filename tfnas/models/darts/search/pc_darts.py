@@ -162,11 +162,8 @@ class Network(Model):
         logits = self.fc(x)
         return logits
 
-    def model_parameters(self):
-        return self.trainable_variables[:-4]
-
-    def arch_parameters(self):
-        return self.trainable_variables[-4:]
+    def param_splits(self):
+        return slice(None, -4), slice(-4, None)
 
     def genotype(self):
         PRIMITIVES = get_primitives()
