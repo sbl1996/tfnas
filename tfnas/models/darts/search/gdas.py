@@ -34,8 +34,9 @@ class MixedOp(Layer):
             self._ops.append(op)
 
     def call(self, x, hardwts):
+        ones = tf.ones_like(x)[:, ::self.stride, ::self.stride, :]
         xs = [
-            tf.cond(hardwts[i] == 1, lambda: self._ops[i](x) * hardwts[i], lambda: hardwts[i])
+            tf.cond(hardwts[i] == 1, lambda: self._ops[i](x) * hardwts[i], lambda: hardwts[i] * ones)
             for i in range(len(self._ops))
         ]
         return sum(xs)
@@ -65,14 +66,12 @@ class Cell(Layer):
     def call(self, s0, s1, hardwts):
         s0 = self.preprocess0(s0)
         s1 = self.preprocess1(s1)
-
         states = [s0, s1]
         offset = 0
         for i in range(self._steps):
             s = tf.add_n([self._ops[offset + j](h, hardwts[offset + j]) for j, h in enumerate(states)])
             offset += len(states)
             states.append(s)
-
         return tf.concat(states[-self._multiplier:], axis=-1)
 
 
@@ -125,8 +124,8 @@ class Network(Model):
 
     def call(self, x):
         s0 = s1 = self.stem(x)
-        hardwts_reduce = gumbel_softmax(self.alphas_reduce, self.tau)
-        hardwts_normal = gumbel_softmax(self.alphas_normal, self.tau)
+        hardwts_reduce = gumbel_softmax(self.alphas_reduce, self.tau, hard=True)
+        hardwts_normal = gumbel_softmax(self.alphas_normal, self.tau, hard=True)
         for cell in self.cells:
             hardwts = hardwts_reduce if cell.reduction else hardwts_normal
             hardwts = tf.cast(hardwts, s0.dtype)

@@ -53,9 +53,9 @@ set_defaults({
     'fixed_padding': True,
 })
 
-set_primitives('tiny')
+set_primitives('darts')
 
-model = Network(4, 5)
+model = Network(4, 8)
 model.build((None, 32, 32, 3))
 
 criterion = CrossEntropy()

@@ -14,7 +14,7 @@ class LayerChoice(Layer):
 
     def call(self, x, hardwts, index):
         xs = [
-            tf.cond(hardwts[i] == 1, lambda: self.choices[i](x) * hardwts[i], lambda: hardwts[i])
+            tf.cond(hardwts[i] == 1, lambda: self.choices[i](x) * hardwts[i], lambda: hardwts[i] * tf.ones_like(x))
             for i in range(self.n_choices)]
         return sum(xs)
 
