@@ -1,83 +1,102 @@
-import torch
-import torch.nn as nn
-from torch.optim import SGD, Adam
-from torch.utils.data import DataLoader
-from torchvision.datasets import CIFAR10
-from torchvision.transforms import ToTensor, Normalize, Compose, RandomCrop, RandomHorizontalFlip
+import math
 
-from hhutil.io import parse_python_config
+from toolz import curry
 
-from horch.datasets import train_test_split
-from horch.defaults import set_defaults
-from horch.optim.lr_scheduler import CosineLR
-from horch.train.metrics import TrainLoss, Loss
-from horch.train.cls.metrics import Accuracy
-from horch.train import manual_seed
+import tensorflow as tf
+from tensorflow.keras.metrics import CategoricalAccuracy, Mean, CategoricalCrossentropy
+from tensorflow_addons.optimizers import AdamW
 
-from hinas.models.primitives import set_primitives
-from hinas.train.darts import DARTSLearner
+from hanser.datasets.classification.cifar import load_cifar10
+from hanser.datasets.classification.numpy import subsample
+from hanser.transform import random_crop, normalize, to_tensor, cutout
 
-cfg = parse_python_config("config.py")
+from hanser.train.lr_schedule import CosineLR
+from hanser.losses import CrossEntropy
+from hanser.datasets import prepare
+from hanser.train.optimizers import SGD
+from hanser.models.layers import set_defaults
 
-torch.backends.cudnn.enabled = True
-torch.backends.cudnn.benchmark = True
-manual_seed(cfg.seed)
+from tfnas.models.darts.search.darts import Network
+from tfnas.train.darts import DARTSLearner
 
-train_transform = Compose([
-    RandomCrop(32, padding=4),
-    RandomHorizontalFlip(),
-    ToTensor(),
-    Normalize([0.491, 0.482, 0.447], [0.247, 0.243, 0.262]),
-])
+@curry
+def transform(image, label, training):
 
-valid_transform = Compose([
-    ToTensor(),
-    Normalize([0.491, 0.482, 0.447], [0.247, 0.243, 0.262]),
-])
+    if training:
+        image = random_crop(image, (32, 32), (4, 4))
+        image = tf.image.random_flip_left_right(image)
+        # image = autoaugment(image, "CIFAR10")
 
-root = 'datasets/CIFAR10'
-ds = CIFAR10(root, train=True, download=True)
+    image, label = to_tensor(image, label)
+    image = normalize(image, [0.491, 0.482, 0.447], [0.247, 0.243, 0.262])
 
-ds_train, ds_search = train_test_split(
-    ds, test_ratio=0.5, shuffle=True, random_state=cfg.seed,
-    transform=train_transform, test_transform=train_transform)
-ds_val = train_test_split(
-    ds, test_ratio=0.5, shuffle=True, random_state=cfg.seed,
-    test_transform=valid_transform)[1]
+    if training:
+        image = cutout(image, 16)
 
-train_loader = DataLoader(ds_train, batch_size=cfg.train_batch_size, pin_memory=True, shuffle=True, num_workers=2)
-search_loader = DataLoader(ds_search, batch_size=cfg.search_batch_size, pin_memory=True, shuffle=True, num_workers=2)
-val_loader = DataLoader(ds_val, batch_size=cfg.val_batch_size, pin_memory=True, shuffle=False, num_workers=2)
+    label = tf.one_hot(label, 10)
+
+    return image, label
+
+batch_size = 64
+eval_batch_size = 64
+
+(x_train, y_train), (x_test, y_test) = load_cifar10()
+
+x_train, y_train = subsample(x_train, y_train, ratio=0.01)
+x_test, y_test = subsample(x_test, y_test, ratio=0.01)
+
+n_val = len(x_train) // 2
+x_val, y_val = x_train[n_val:], y_train[n_val:]
+x_train, y_train = x_train[:n_val], y_train[:n_val]
+
+n_train, n_test = len(x_train), len(x_test)
+steps_per_epoch = n_train // batch_size
+test_steps = math.ceil(n_test / eval_batch_size)
+
+ds_train = tf.data.Dataset.from_tensor_slices((x_train, y_train))
+ds_val = tf.data.Dataset.from_tensor_slices((x_val, y_val))
+ds_test = tf.data.Dataset.from_tensor_slices((x_test, y_test))
+
+ds_train = prepare(ds_train, batch_size, transform(training=True), training=True,
+                   buffer_size=n_train, prefetch=False)
+ds_val = prepare(ds_val, batch_size, transform(training=False), training=True,
+                 buffer_size=n_val, prefetch=False)
+ds_test = prepare(ds_test, eval_batch_size, transform(training=False), training=False,
+                  buffer_size=n_test)
+ds_trainval = tf.data.Dataset.zip((ds_train, ds_val))
+ds_trainval = ds_trainval.prefetch(tf.data.experimental.AUTOTUNE)
 
 set_defaults({
-    'relu': {
-        'inplace': False,
-    },
     'bn': {
         'affine': False,
     }
 })
-set_primitives(cfg.primitives)
-model = cfg.network_fn()
-criterion = nn.CrossEntropyLoss()
 
-epochs = cfg.epochs
-optimizer_arch = Adam(model.arch_parameters(), lr=cfg.arch_lr, betas=(0.5, 0.999), weight_decay=1e-3)
-optimizer_model = SGD(model.model_parameters(), cfg.model_lr, momentum=0.9, weight_decay=getattr(cfg, "model_wd", 3e-4))
-lr_scheduler = CosineLR(optimizer_model, epochs, min_lr=getattr(cfg, "model_min_lr", 0))
+model = Network(4, 5)
+model.build((None, 32, 32, 3))
+
+criterion = CrossEntropy()
+
+base_lr = 0.1
+epochs = 50
+lr_schedule = CosineLR(base_lr, steps_per_epoch, epochs=epochs, min_lr=0)
+optimizer_model = SGD(0.025, momentum=0.9, weight_decay=3e-4)
+optimizer_arch = AdamW(weight_decay=1e-3, learning_rate=3e-4, beta_1=0.5)
+
 
 train_metrics = {
-    "loss": TrainLoss(),
-    "acc": Accuracy(),
+    'loss': Mean(),
+    'acc': CategoricalAccuracy(),
 }
-
 eval_metrics = {
-    "loss": Loss(criterion),
-    "acc": Accuracy(),
+    'loss': CategoricalCrossentropy(from_logits=True),
+    'acc': CategoricalAccuracy(),
 }
 
-trainer = DARTSLearner(model, criterion, optimizer_arch, optimizer_model, lr_scheduler,
-                       train_metrics=train_metrics, eval_metrics=eval_metrics,
-                       search_loader=search_loader, grad_clip_norm=cfg.grad_clip_norm, work_dir=cfg.work_dir)
+learner = DARTSLearner(
+    model, criterion, optimizer_arch, optimizer_model,
+    train_metrics=train_metrics, eval_metrics=eval_metrics,
+    work_dir=f"./cifar10", grad_clip_norm=5.0)
 
-trainer.fit(search_loader, epochs, val_loader, val_freq=getattr(cfg, "val_freq", 5), callbacks=cfg.callbacks)
+learner.fit(ds_trainval, epochs, ds_test, val_freq=5,
+            steps_per_epoch=steps_per_epoch, val_steps=test_steps)
