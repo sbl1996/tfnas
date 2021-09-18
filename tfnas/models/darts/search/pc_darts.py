@@ -36,8 +36,7 @@ class MixedOp(Layer):
                 ])
             self._ops.append(op)
 
-    def call(self, inputs):
-        x, alphas = inputs
+    def call(self, x, alphas):
         x1 = x[:, :, :, :self._channels]
         x2 = x[:, :, :, self._channels:]
         x1 = tf.add_n([alphas[i] * op(x1) for i, op in enumerate(self._ops)])
@@ -69,15 +68,14 @@ class Cell(Layer):
                 op = MixedOp(C, stride, k)
                 self._ops.append(op)
 
-    def call(self, inputs):
-        s0, s1, alphas, betas = inputs
+    def call(self, s0, s1, alphas, betas):
         s0 = self.preprocess0(s0)
         s1 = self.preprocess1(s1)
 
         states = [s0, s1]
         offset = 0
         for i in range(self._steps):
-            s = tf.add_n([betas[offset + j] * self._ops[offset + j]([h, alphas[offset + j]]) for j, h in enumerate(states)])
+            s = tf.add_n([betas[offset + j] * self._ops[offset + j](h, alphas[offset + j]) for j, h in enumerate(states)])
             offset += len(states)
             states.append(s)
 
@@ -157,8 +155,8 @@ class Network(Model):
         for cell in self.cells:
             alphas = alphas_reduce if cell.reduction else alphas_normal
             betas = betas_reduce if cell.reduction else betas_normal
-            alphas, betas = tf.cast(alphas), tf.cast(betas)
-            s0, s1 = s1, cell([s0, s1, alphas, betas])
+            alphas, betas = tf.cast(alphas, s0.dtype), tf.cast(betas, s0.dtype)
+            s0, s1 = s1, cell(s0, s1, alphas, betas)
         x = self.global_pool(s1)
         logits = self.fc(x)
         return logits

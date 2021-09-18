@@ -129,7 +129,7 @@ class Network(Model):
         hardwts_normal = gumbel_softmax(self.alphas_normal, self.tau)
         for cell in self.cells:
             hardwts = hardwts_reduce if cell.reduction else hardwts_normal
-            hardwts = tf.cast(hardwts, x.dtype)
+            hardwts = tf.cast(hardwts, s0.dtype)
             s0, s1 = s1, cell(s0, s1, hardwts)
         x = self.avg_pool(s1)
         logits = self.classifier(x)

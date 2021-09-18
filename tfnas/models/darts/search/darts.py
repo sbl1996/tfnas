@@ -32,8 +32,7 @@ class MixedOp(Layer):
                     ])
             self._ops.append(op)
 
-    def call(self, inputs):
-        x, weights = inputs
+    def call(self, x, weights):
         return tf.add_n([weights[i] * op(x) for i, op in enumerate(self._ops)])
 
 
@@ -58,15 +57,14 @@ class Cell(Layer):
                 op = MixedOp(C, stride, drop_path)
                 self._ops.append(op)
 
-    def call(self, inputs):
-        s0, s1, weights = inputs
+    def call(self, s0, s1, weights):
         s0 = self.preprocess0(s0)
         s1 = self.preprocess1(s1)
 
         states = [s0, s1]
         offset = 0
         for i in range(self._steps):
-            s = tf.add_n([self._ops[offset + j]([h, weights[offset + j]]) for j, h in enumerate(states)])
+            s = tf.add_n([self._ops[offset + j](h, weights[offset + j]) for j, h in enumerate(states)])
             offset += len(states)
             states.append(s)
 
@@ -124,8 +122,8 @@ class Network(Model):
         weights_normal = tf.nn.softmax(self.alphas_normal, axis=-1)
         for cell in self.cells:
             weights = weights_reduce if cell.reduction else weights_normal
-            weights = tf.cast(weights, x.dtype)
-            s0, s1 = s1, cell([s0, s1, weights])
+            weights = tf.cast(weights, s0.dtype)
+            s0, s1 = s1, cell(s0, s1, weights)
         x = self.avg_pool(s1)
         logits = self.classifier(x)
         return logits
