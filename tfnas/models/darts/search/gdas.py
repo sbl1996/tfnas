@@ -39,7 +39,7 @@ class MixedOp(Layer):
             tf.cond(hardwts[i] == 1, lambda: self._ops[i](x) * hardwts[i], lambda: hardwts[i] * ones)
             for i in range(len(self._ops))
         ]
-        return sum(xs)
+        return tf.add_n(xs)
 
 
 class Cell(Layer):
