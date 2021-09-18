@@ -16,6 +16,7 @@ from tfnas.models.darts.search.darts import Network
 from tfnas.train.darts import DARTSLearner
 from tfnas.models.darts.primitives import set_primitives
 from tfnas.datasets.cifar import make_darts_cifar10_dataset
+from tfnas.train.callbacks import PrintGenotype, TrainArch
 
 @curry
 def transform(image, label, training):
@@ -36,14 +37,14 @@ def transform(image, label, training):
     return image, label
 
 mul = 4
-batch_size = 64 * mul
-eval_batch_size = 64 * mul
+batch_size = 2 * mul
+eval_batch_size = 2 * mul
 
 ds_train, ds_eval, steps_per_epoch, eval_steps = make_darts_cifar10_dataset(
-    batch_size, eval_batch_size, transform, sub_ratio=0.01)
+    batch_size, eval_batch_size, transform, sub_ratio=0.001)
 
-setup_runtime(fp16=True)
-ds_train, ds_eval = distribute_datasets(ds_train, ds_eval)
+# setup_runtime(fp16=True)
+# ds_train, ds_eval = distribute_datasets(ds_train, ds_eval)
 
 set_defaults({
     'bn': {
@@ -52,7 +53,7 @@ set_defaults({
     'fixed_padding': True,
 })
 
-set_primitives('darts')
+set_primitives('tiny')
 
 model = Network(4, 5)
 model.build((None, 32, 32, 3))
@@ -63,7 +64,7 @@ base_lr = 0.025
 epochs = 50
 lr_schedule = CosineLR(base_lr * mul, steps_per_epoch, epochs=epochs, min_lr=0)
 optimizer_model = SGD(lr_schedule, momentum=0.9, weight_decay=3e-4)
-optimizer_arch = AdamW(weight_decay=1e-3, learning_rate=3e-4, beta_1=0.5)
+optimizer_arch = AdamW(learning_rate=6e-4, beta_1=0.5, weight_decay=1e-3)
 
 
 train_metrics = {
@@ -76,9 +77,10 @@ eval_metrics = {
 }
 
 learner = DARTSLearner(
-    model, criterion, optimizer_arch, optimizer_model,
+    model, criterion, optimizer_arch, optimizer_model, xla_compile=False,
     train_metrics=train_metrics, eval_metrics=eval_metrics,
     work_dir=f"./cifar10", grad_clip_norm=5.0)
 
 learner.fit(ds_train, epochs, ds_eval, val_freq=5,
-            steps_per_epoch=steps_per_epoch, val_steps=eval_steps)
+            steps_per_epoch=steps_per_epoch, val_steps=eval_steps,
+            callbacks=[PrintGenotype(16), TrainArch(16)])
