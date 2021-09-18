@@ -1,6 +1,6 @@
 from collections import namedtuple
 
-from hanser.models.nas.operations import OPS
+from tfnas.models.darts.operations import OPS
 
 Genotype = namedtuple('Genotype', 'normal normal_concat reduce reduce_concat')
 

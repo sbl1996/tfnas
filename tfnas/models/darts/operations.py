@@ -34,7 +34,7 @@ OPS = {
 
 class ReLUConvBN(Sequential):
 
-    def __init__(self, C_in, C_out, kernel_size, stride):
+    def __init__(self, C_in, C_out, kernel_size, stride=1):
         super().__init__([
             Act(),
             Conv2d(C_in, C_out, kernel_size, stride=stride, bias=False),

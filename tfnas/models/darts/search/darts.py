@@ -3,11 +3,11 @@ from tensorflow.keras import Sequential, Model
 from tensorflow.keras.initializers import RandomNormal
 from tensorflow.keras.layers import Layer
 
-from hanser.models.nas.operations import FactorizedReduce, ReLUConvBN, OPS
-from hanser.models.nas.genotypes import get_primitives, Genotype
 from hanser.models.layers import Norm, Conv2d, GlobalAvgPool, Linear
 from hanser.models.modules import DropPath
 
+from tfnas.models.darts.operations import FactorizedReduce, ReLUConvBN, OPS
+from tfnas.models.darts.genotypes import get_primitives, Genotype
 
 class MixedOp(Layer):
 

@@ -12,7 +12,7 @@ from hanser.losses import CrossEntropy
 from hanser.train.optimizers import SGD
 from hanser.models.layers import set_defaults
 
-from tfnas.models.darts.search.gdas import Network
+from tfnas.models.darts.search.gdas_frc import Network
 from tfnas.train.darts import DARTSLearner
 from tfnas.models.darts.primitives import set_primitives
 from tfnas.datasets.cifar import make_darts_cifar10_dataset
@@ -55,7 +55,7 @@ set_defaults({
 
 set_primitives('darts')
 
-model = Network(4, 8)
+model = Network(16, 8)
 model.build((None, 32, 32, 3))
 
 criterion = CrossEntropy()
