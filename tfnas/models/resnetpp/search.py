@@ -159,8 +159,8 @@ class Network(Model):
 
         self._initialize_alphas()
 
-        self._0_1_loss_weight = self.add_weight(
-            name="_0_1_loss_weight", shape=(),
+        self.fair_loss_weight = self.add_weight(
+            name="fair_loss_weight", shape=(),
             dtype=self.dtype, initializer=Constant(1.),
             trainable=False,
         )
@@ -209,9 +209,9 @@ class Network(Model):
 
     def arch_loss(self):
         probs = tf.nn.sigmoid(self.alphas)
-        _0_1_loss = -tf.square((probs - 0.5))
-        _0_1_loss = tf.reduce_mean(_0_1_loss)
-        _0_1_loss = _0_1_loss + 0.25
+        fair_loss = -tf.square((probs - 0.5))
+        fair_loss = tf.reduce_mean(fair_loss)
+        fair_loss = fair_loss + 0.25
 
         k = self.splits
         n = tf.range(k)
@@ -228,7 +228,7 @@ class Network(Model):
 
         l2_loss = 0.5 * tf.square(self.alphas)
         l2_loss = tf.reduce_mean(l2_loss)
-        return self._0_1_loss_weight * _0_1_loss + self.conn_loss_weight * conn_loss + self.l2_loss_weight * l2_loss
+        return self.fair_loss_weight * fair_loss + self.conn_loss_weight * conn_loss + self.l2_loss_weight * l2_loss
 
     def genotype(self, threshold=0.9):
         alphas = tf.convert_to_tensor(self.alphas.numpy())
