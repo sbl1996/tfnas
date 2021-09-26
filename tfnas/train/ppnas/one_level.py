@@ -34,6 +34,10 @@ class PPNASLearner(Learner):
         self.apply_gradients(optimizer_arch, grads[arch_slice], variables[arch_slice])
         self.update_metrics(self.train_metrics, target, logits, per_example_loss)
 
+    def train_batches(self, *batches):
+        batch = tuple(tf.concat(xs, axis=0) for xs in zip(*batches))
+        return self.train_batch(batch)
+
     def eval_batch(self, batch):
         inputs, target = batch
         inputs = cast(inputs, self.dtype)
