@@ -12,11 +12,11 @@ class NetworkExt(Network):
         k = sum(4 + i for i in range(self.splits))
 
         self.alphas = self.add_weight(
-            'alphas', (k,), initializer=Constant(0.), trainable=True,
+            'alphas', (1, k), initializer=Constant(0.), trainable=True,
         )
 
     def call(self, x):
-        alphas = tf.nn.sigmoid(self.alphas)
+        alphas = tf.nn.sigmoid(self.alphas[0])
 
         x = self.stem(x)
         alphas = tf.cast(alphas, x.dtype)
@@ -36,7 +36,7 @@ class NetworkExt(Network):
         return x
 
     def genotype(self, threshold=0.9):
-        alphas = tf.convert_to_tensor(self.alphas.numpy())
+        alphas = tf.convert_to_tensor(self.alphas[0].numpy())
         alphas = tf.nn.sigmoid(alphas).numpy()
 
         conn = []
