@@ -47,6 +47,7 @@ ds_train, ds_eval = distribute_datasets(ds_train, ds_eval)
 set_defaults({
     'bn': {
         'affine': False,
+        'track_running_stats': False,
     },
 })
 

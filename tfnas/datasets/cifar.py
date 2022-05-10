@@ -8,19 +8,22 @@ from hanser.datasets.classification.numpy import subsample
 
 
 def make_darts_cifar10_dataset(
-    batch_size, eval_batch_size, transform, sub_ratio=None):
+    batch_size, eval_batch_size, transform, drop_remainder=None, sub_ratio=None):
     return make_cifar_dataset(
-        load_cifar10, batch_size, eval_batch_size, transform, sub_ratio)
+        load_cifar10, batch_size, eval_batch_size, transform, drop_remainder, sub_ratio)
 
 
 def make_darts_cifar100_dataset(
-    batch_size, eval_batch_size, transform, sub_ratio=None):
+    batch_size, eval_batch_size, transform, drop_remainder=None, sub_ratio=None):
     return make_cifar_dataset(
-        load_cifar100, batch_size, eval_batch_size, transform, sub_ratio)
+        load_cifar100, batch_size, eval_batch_size, transform, drop_remainder, sub_ratio)
 
 
 def make_cifar_dataset(
-    load_fn, batch_size, eval_batch_size, transform, sub_ratio=None):
+    load_fn, batch_size, eval_batch_size, transform, drop_remainder=None, sub_ratio=None):
+
+    if drop_remainder is None:
+        drop_remainder = False
 
     (x_train, y_train), (_x_test, _y_test) = load_fn()
 
@@ -42,8 +45,10 @@ def make_cifar_dataset(
                        buffer_size=n_train, prefetch=False)
     ds_search = prepare(ds_val, batch_size, transform(training=False), training=True,
                         buffer_size=n_val, prefetch=False)
-    ds_val = prepare(ds_val, eval_batch_size, transform(training=False), training=False,
-                     buffer_size=n_val)
     ds_train = tf.data.Dataset.zip((ds_train, ds_search))
     ds_train = ds_train.prefetch(tf.data.experimental.AUTOTUNE)
+
+    ds_val = prepare(ds_val, eval_batch_size, transform(training=False), training=False,
+                     buffer_size=n_val, drop_remainder=drop_remainder)
+
     return ds_train, ds_val, steps_per_epoch, eval_steps
