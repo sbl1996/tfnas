@@ -1,4 +1,4 @@
-from tfnas.models.darts.operations import OPS
+from tfnas.models.nasnet.operations import OPS
 
 PRIMITIVES_nas_bench_201 = [
     'none',

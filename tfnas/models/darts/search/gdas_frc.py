@@ -6,8 +6,10 @@ from tensorflow.keras.layers import Layer
 from hanser.models.layers import Norm, Conv2d, GlobalAvgPool, Linear, Act, Pool2d
 from hanser.ops import gumbel_softmax
 
-from tfnas.models.darts.operations import ReLUConvBN
-from tfnas.models.darts.genotypes import get_primitives, Genotype
+from tfnas.models.nasnet.operations import ReLUConvBN
+from tfnas.models.nasnet.genotypes import Genotype
+from tfnas.models.nasnet.primitives import get_primitives
+
 from tfnas.models.darts.search.gdas import Cell
 
 

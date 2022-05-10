@@ -5,8 +5,9 @@ from tensorflow.keras.layers import Layer
 
 from hanser.models.layers import Norm, Conv2d, GlobalAvgPool, Linear, Pool2d
 
-from tfnas.models.darts.operations import FactorizedReduce, ReLUConvBN, OPS
-from tfnas.models.darts.genotypes import get_primitives, Genotype
+from tfnas.models.nasnet.operations import FactorizedReduce, ReLUConvBN, OPS
+from tfnas.models.nasnet.genotypes import Genotype
+from tfnas.models.nasnet.primitives import get_primitives
 
 
 def channel_shuffle(x, groups):

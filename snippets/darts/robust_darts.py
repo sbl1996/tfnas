@@ -12,10 +12,10 @@ from hanser.train.optimizers import SGD, AdamW
 from hanser.models.layers import set_defaults
 
 from tfnas.train.darts import DARTSLearner
-from tfnas.models.darts.search.pc_darts import Network
+from tfnas.models.darts.search.darts import Network
 from tfnas.models.nasnet.primitives import set_primitives
 from tfnas.datasets.cifar import make_darts_cifar10_dataset
-from tfnas.train.callbacks import PrintGenotype, TrainArch
+from tfnas.train.callbacks import PrintGenotype
 
 @curry
 def transform(image, label, training):
@@ -23,7 +23,6 @@ def transform(image, label, training):
     if training:
         image = random_crop(image, (32, 32), (4, 4))
         image = tf.image.random_flip_left_right(image)
-        # image = autoaugment(image, "CIFAR10")
 
     image, label = to_tensor(image, label)
     image = normalize(image, [0.491, 0.482, 0.447], [0.247, 0.243, 0.262])
@@ -35,8 +34,8 @@ def transform(image, label, training):
 
     return image, label
 
-batch_size = 256
-eval_batch_size = 256
+batch_size = 64
+eval_batch_size = 64
 
 ds_train, ds_eval, steps_per_epoch, eval_steps = make_darts_cifar10_dataset(
     batch_size, eval_batch_size, transform)
@@ -52,16 +51,16 @@ set_defaults({
 
 set_primitives('darts')
 
-model = Network(16, 8, k=4)
+model = Network(16, 8)
 model.build((None, 32, 32, 3))
 
 criterion = CrossEntropy()
 
-base_lr = 0.1
+base_lr = 0.025
 epochs = 50
 lr_schedule = CosineLR(base_lr, steps_per_epoch, epochs=epochs, min_lr=1e-3)
-optimizer_model = SGD(lr_schedule, momentum=0.9, weight_decay=3e-4)
-optimizer_arch = AdamW(learning_rate=6e-4, beta_1=0.5, weight_decay=1e-3)
+optimizer_model = SGD(lr_schedule, momentum=0.9, weight_decay=3e-4 * 81)
+optimizer_arch = AdamW(learning_rate=3e-4, beta_1=0.5, weight_decay=1e-3)
 
 
 train_metrics = {
@@ -80,4 +79,4 @@ learner = DARTSLearner(
 
 learner.fit(ds_train, epochs, ds_eval, val_freq=5,
             steps_per_epoch=steps_per_epoch, val_steps=eval_steps,
-            callbacks=[PrintGenotype(16), TrainArch(16)])
+            callbacks=[PrintGenotype(1)])

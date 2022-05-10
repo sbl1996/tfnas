@@ -1,19 +1,14 @@
 import tensorflow as tf
-from hanser.train.learner import Learner, cast
-
-
-from tfnas.models.ppnas.search import Network
-
+from hanser.train.klearner import Learner, cast, apply_gradients, reduce_loss, update_metrics
 
 class DARTSLearner(Learner):
 
-    def __init__(self, model: Network, criterion, optimizer_arch, optimizer_model,
+    def __init__(self, model, criterion, optimizer_arch, optimizer_model,
                  grad_clip_norm=0.0, train_arch=True, **kwargs):
         self.grad_clip_norm = grad_clip_norm
         self.train_arch = train_arch
         super().__init__(model, criterion, (optimizer_arch, optimizer_model), **kwargs)
 
-    @tf.function(experimental_compile=False)
     def _train_arch(self, batch):
         model = self.model
         arch_params = model.trainable_variables[model.param_splits()[1]]
@@ -21,15 +16,14 @@ class DARTSLearner(Learner):
 
         input_search, target_search = batch
         with tf.GradientTape() as tape:
-            input_search = cast(input_search, self.dtype)
-            logits_search = self.model(input_search, training=True)
+            input_search = cast(input_search, self._dtype)
+            logits_search = model(input_search, training=True)
             logits_search = cast(logits_search, tf.float32)
             per_example_loss = self.criterion(target_search, logits_search)
-            loss_search = self.reduce_loss(per_example_loss)
+            loss_search = reduce_loss(per_example_loss)
         grads = tape.gradient(loss_search, arch_params)
-        self.apply_gradients(optimizer_arch, grads, arch_params)
+        apply_gradients(optimizer_arch, grads, arch_params, distribute_strategy=self._distribute_strategy)
 
-    @tf.function(experimental_compile=False)
     def _train_model(self, batch):
         model = self.model
         model_params = model.trainable_variables[model.param_splits()[0]]
@@ -37,24 +31,27 @@ class DARTSLearner(Learner):
 
         input, target = batch
         with tf.GradientTape() as tape:
-            input = cast(input, self.dtype)
+            input = cast(input, self._dtype)
             logits = model(input, training=True)
             logits = cast(logits, tf.float32)
             per_example_loss = self.criterion(target, logits)
-            loss = self.reduce_loss(per_example_loss)
+            loss = reduce_loss(per_example_loss)
 
         grads = tape.gradient(loss, model_params)
-        self.apply_gradients(optimizer_model, grads, model_params, self.grad_clip_norm)
-        self.update_metrics(self.train_metrics, target, logits, per_example_loss)
+        apply_gradients(optimizer_model, grads, model_params, self.grad_clip_norm,
+                        distribute_strategy=self._distribute_strategy)
+        update_metrics(self.train_metrics, target, logits, per_example_loss)
+        return {k: m.result() for k, m in self.train_metrics.items()}
 
     def train_batch(self, batch):
         if self.train_arch:
             self._train_arch(batch[1])
-        self._train_model(batch[0])
+        return self._train_model(batch[0])
 
     def eval_batch(self, batch):
         inputs, target = batch
-        inputs = cast(inputs, self.dtype)
+        inputs = cast(inputs, self._dtype)
         preds = self.model(inputs, training=False)
         preds = cast(preds, tf.float32)
-        self.update_metrics(self.eval_metrics, target, preds)
+        update_metrics(self.eval_metrics, target, preds)
+        return {k: m.result() for k, m in self.eval_metrics.items()}
