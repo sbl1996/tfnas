@@ -38,7 +38,7 @@ batch_size = 64
 eval_batch_size = 64
 
 ds_train, ds_eval, steps_per_epoch, eval_steps = make_darts_cifar10_dataset(
-    batch_size, eval_batch_size, transform)
+    batch_size, eval_batch_size, transform, drop_remainder=True)
 
 setup_runtime(fp16=True)
 ds_train, ds_eval = distribute_datasets(ds_train, ds_eval)

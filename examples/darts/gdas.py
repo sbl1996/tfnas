@@ -12,7 +12,7 @@ from hanser.train.optimizers import SGD, AdamW
 from hanser.models.layers import set_defaults
 
 from tfnas.train.darts import DARTSLearner
-from tfnas.models.darts.search.gdas_frc import Network
+from tfnas.models.darts.search.gdas import Network
 from tfnas.models.nasnet.primitives import set_primitives
 from tfnas.datasets.cifar import make_darts_cifar10_dataset
 from tfnas.train.callbacks import PrintGenotype, TauSchedule
@@ -39,7 +39,7 @@ batch_size = 64
 eval_batch_size = 64
 
 ds_train, ds_eval, steps_per_epoch, eval_steps = make_darts_cifar10_dataset(
-    batch_size, eval_batch_size, transform)
+    batch_size, eval_batch_size, transform, drop_remainder=True)
 
 setup_runtime(fp16=True)
 ds_train, ds_eval = distribute_datasets(ds_train, ds_eval)
@@ -75,7 +75,7 @@ eval_metrics = {
 }
 
 learner = DARTSLearner(
-    model, criterion, optimizer_arch, optimizer_model,
+    model, criterion, optimizer_arch, optimizer_model, steps_per_loop=1,
     train_metrics=train_metrics, eval_metrics=eval_metrics,
     work_dir=f"./models/darts_search", grad_clip_norm=5.0)
 

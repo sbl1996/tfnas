@@ -36,7 +36,10 @@ class TrainArch(Callback):
         self.from_epoch = from_epoch
 
     def begin_epoch(self, state):
-        self.learner.train_arch = self.learner.epoch + 1 >= self.from_epoch
+        epoch = self.learner.epoch + 1
+        self.learner.train_arch = epoch >= self.from_epoch
+        if epoch == self.from_epoch:
+            self.learner.remake()
 
 
 class TauSchedule(Callback):

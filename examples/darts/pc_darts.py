@@ -23,7 +23,6 @@ def transform(image, label, training):
     if training:
         image = random_crop(image, (32, 32), (4, 4))
         image = tf.image.random_flip_left_right(image)
-        # image = autoaugment(image, "CIFAR10")
 
     image, label = to_tensor(image, label)
     image = normalize(image, [0.491, 0.482, 0.447], [0.247, 0.243, 0.262])
@@ -39,7 +38,7 @@ batch_size = 256
 eval_batch_size = 256
 
 ds_train, ds_eval, steps_per_epoch, eval_steps = make_darts_cifar10_dataset(
-    batch_size, eval_batch_size, transform)
+    batch_size, eval_batch_size, transform, drop_remainder=True)
 
 setup_runtime(fp16=True)
 ds_train, ds_eval = distribute_datasets(ds_train, ds_eval)
